@@ -10,25 +10,23 @@ import { Score } from './entities/score.js';
 import { WelcomeMessage } from './entities/welcome_message.js';
 import { GameOver } from './entities/game_over.js';
 
-// ===== Canvas / State
 const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const win = new Window(canvas.width, canvas.height);
+const ctx = canvas.getContext('2d', { alpha: false });
+ctx.imageSmoothingEnabled = false; // crisper on phones
 
+const win = new Window(canvas.width, canvas.height);
 const images = new Images();
 const sounds = new Sounds();
-const config = { ctx, window: win, images, sounds, screen: canvas, tick: () => {} };
+const config = { ctx, window: win, images, sounds, screen: canvas, tick: () => {}, dt: 1 };
 
-// HUD elements (if you have them)
 const startBtn = document.getElementById('startBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const resumeBtn = document.getElementById('resumeBtn');
-const lbBtn = document.getElementById('leaderboardBtn'); // optional
+const lbBtn = document.getElementById('leaderboardBtn');
 
 let running = false, paused = false, rafId = null;
-let background, floor, pipes, player, score, welcomeMsg, gameOverMsg;
+let background, floor, pipes, player, score, welcomeMsg;
 
-// ===== Helpers
 function togglePauseButtons() {
   if (!pauseBtn || !resumeBtn) return;
   pauseBtn.hidden = !running || paused;
@@ -39,87 +37,99 @@ function collides(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
-// ===== Init + Start
 async function init() {
-  await images.load(); // loads backgrounds / player frames / pipes / base / ui
-  background = new Background(config);
-  floor = new Floor(config);
-  pipes = new Pipes(config);
-  player = new Player(config); // starts in SHM
-  score = new Score(config);
-  welcomeMsg = new WelcomeMessage(config);
-  gameOverMsg = new GameOver(config);
+  await images.load();
+  background  = new Background(config);
+  floor       = new Floor(config);
+  pipes       = new Pipes(config);
+  player      = new Player(config); // idle mode initially
+  score       = new Score(config);
+  welcomeMsg  = new WelcomeMessage(config);
 
-  // First paint (idle screen)
   drawStatic();
 
-  // Wire inputs
   canvas.addEventListener('pointerdown', () => player?.flap());
-  window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.code === 'ArrowUp') {
-      e.preventDefault();
-      player?.flap();
-    }
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); player?.flap(); }
   });
 
   startBtn?.addEventListener('click', start);
   pauseBtn?.addEventListener('click', () => { paused = true; togglePauseButtons(); });
-  resumeBtn?.addEventListener('click', () => { paused = false; loop(); togglePauseButtons(); });
-  lbBtn?.addEventListener('click', () => { /* open your LB panel if you have one */ });
+  resumeBtn?.addEventListener('click', () => { paused = false; loop(performance.now()); togglePauseButtons(); });
+  lbBtn?.addEventListener('click', () => { /* open local LB panel if you added one */ });
 }
 
 function drawStatic() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  background.tick();
-  floor.tick();
-  welcomeMsg.tick();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  background.tick(config.dt);
+  floor.tick(config.dt);
+  welcomeMsg.tick(config.dt);
 }
 
 function start() {
   running = true; paused = false; togglePauseButtons();
 
-  // Re-roll random skin set and rebuild entities for a fresh run
   images.randomize();
-  background = new Background(config);
-  floor = new Floor(config);
-  pipes = new Pipes(config);
-  player = new Player(config);
-  player.set_mode(PlayerMode.NORMAL);          // << critical: activates gravity/flap
+  background  = new Background(config);
+  floor       = new Floor(config);
+  pipes       = new Pipes(config);   // fresh pipe queue
+  player      = new Player(config);
+  player.set_mode(PlayerMode.NORMAL); // << enable physics
   score.reset?.();
 
-  loop();
+  loop(performance.now());
 }
 
-// ===== Main loop
-function loop() {
+// ---------- main loop (delta-time) ----------
+const FIXED = 1000/60;          // 16.67ms baseline
+let last = 0, acc = 0;
+function loop(t) {
   if (paused || !running) { cancelAnimationFrame(rafId); return; }
   rafId = requestAnimationFrame(loop);
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!last) last = t;
+  let dtMs = t - last;          // elapsed
+  last = t;
 
-  background.tick();
-  pipes.tick();
-  floor.tick();
-  player.tick();
-  score.tick?.();
+  // clamp (avoid giant jumps on tab switches)
+  dtMs = Math.min(dtMs, 1000/20);  // max step ~50ms
+  acc += dtMs;
 
-  // Ground collision
-  const groundY = floor.y;
-  if (player.y + player.h >= groundY) return gameOver();
+  while (acc >= FIXED) {
+    config.dt = FIXED / (1000/60); // ~1.0 per 60fps step
+    update();                      // physics update in fixed steps
+    acc -= FIXED;
+  }
 
-  // Pipe collisions & scoring
+  render();                        // draw once per RAF
+}
+
+function update() {
+  pipes.update(config.dt);   // now time-scaled
+  floor.update?.(config.dt);
+  player.update?.(config.dt);
+}
+
+function render() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  background.tick(config.dt);
+  pipes.tick(config.dt);
+  floor.tick(config.dt);
+  player.tick(config.dt);
+  score.tick?.(config.dt);
+
+  // ground collision
+  if (player.y + player.h >= floor.y) return gameOver();
+
+  // pipe collisions + scoring
   for (let i = 0; i < pipes.upper.length; i++) {
     const up = pipes.upper[i], low = pipes.lower[i];
 
-    // score once when player passes the upper pipe's trailing edge
-    if (!up.scored && player.x > up.x + up.w) {
-      up.scored = true;
-      score.add?.();
-    }
+    if (!up.scored && player.x > up.x + up.w) { up.scored = true; score.add?.(); }
 
-    // rect collisions
-    if (collides(player.rect, { x: up.x,  y: up.y,  w: up.w,  h: up.h }) ||
-        collides(player.rect, { x: low.x, y: low.y, w: low.w, h: low.h })) {
+    if (collides(player.hitbox, { x: up.x, y: up.y, w: up.w, h: up.h }) ||
+        collides(player.hitbox, { x: low.x, y: low.y, w: low.w, h: low.h })) {
       return gameOver();
     }
   }
@@ -127,9 +137,7 @@ function loop() {
 
 function gameOver() {
   running = false; paused = false; togglePauseButtons();
-  try { sounds.hit.play(); } catch (_) {}
-  // You can open a "Game Over / Leaderboard" panel here.
+  try { sounds.hit.play(); } catch(_) {}
 }
 
-// ===== Boot
 init();
