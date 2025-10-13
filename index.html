@@ -2,14 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Stoney Bird (JS Port)</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <title>Stoney Bird</title>
   <link rel="stylesheet" href="./style.css" />
+  <link rel="icon" href="assets/sprites/gameover.png" />
 </head>
 <body>
   <div id="app">
-    <canvas id="game" width="288" height="512"></canvas>
-    <div id="hud">
+    <!-- Game canvas -->
+    <canvas id="game" width="288" height="512" aria-label="Stoney Bird"></canvas>
+
+    <!-- Controls / HUD -->
+    <div id="hud" class="controls">
       <button id="startBtn" class="btn">▶️ Start</button>
       <button id="pauseBtn" class="btn">⏸ Pause</button>
       <button id="resumeBtn" class="btn" hidden>▶️ Resume</button>
@@ -18,34 +25,45 @@
       <button id="aboutBtn" class="btn">ℹ️ About</button>
     </div>
 
+    <!-- Settings Panel -->
     <div id="panelSettings" class="panel" hidden>
       <div class="panel-header">
         <h3>Settings</h3>
         <button class="close" data-close="panelSettings">✕</button>
       </div>
       <div class="panel-body">
-        <label class="row"><span>Sound</span><input type="checkbox" id="soundChk"></label>
-        <label class="row"><span>Difficulty</span>
+        <label class="row">
+          <span>Sound</span>
+          <input type="checkbox" id="soundChk" />
+        </label>
+        <label class="row">
+          <span>Difficulty</span>
           <select id="difficultySel">
             <option value="easy">Easy</option>
             <option value="normal" selected>Normal</option>
             <option value="hard">Hard</option>
           </select>
         </label>
-        <label class="row"><span>Player name</span><input id="playerName" maxlength="20" /></label>
+        <label class="row">
+          <span>Player name</span>
+          <input id="playerName" maxlength="20" placeholder="Your name" />
+        </label>
       </div>
     </div>
 
+    <!-- About Panel -->
     <div id="panelAbout" class="panel" hidden>
       <div class="panel-header">
         <h3>About</h3>
         <button class="close" data-close="panelAbout">✕</button>
       </div>
       <div class="panel-body">
-        <p><b>Stoney Bird</b> — JS Canvas port inspired by FlapPyBird.</p>
+        <p><b>Stoney Bird</b> — HTML5 Canvas game inspired by FlapPyBird.</p>
+        <p>Built by <a href="https://t.me/your_username" target="_blank">@your_username</a></p>
       </div>
     </div>
 
+    <!-- Leaderboard Panel -->
     <div id="panelLB" class="panel" hidden>
       <div class="panel-header">
         <h3>Leaderboard (Local)</h3>
@@ -55,8 +73,49 @@
         <ul id="lbList" class="lb"></ul>
       </div>
     </div>
+
+    <!-- Splash / Start Overlay -->
+    <div id="splash" class="splash" aria-hidden="false">
+      <div class="card">
+        <img src="assets/sprites/message.png" alt="" class="hero" />
+        <h1>Flying Stoney</h1>
+        <p class="sub">Tap play to begin. Built with ♥ by <a href="https://t.me/your_username" target="_blank">@your_username</a></p>
+        <div class="row buttons">
+          <button id="splashPlay" class="btn cta">▶ Play</button>
+          <a class="btn ghost" href="https://t.me/your_username" target="_blank">Contact</a>
+        </div>
+      </div>
+    </div>
   </div>
 
+  <!-- Game logic -->
   <script type="module" src="./src/game.js"></script>
+
+  <!-- Tiny helpers: close panels + Telegram tweaks + splash wiring -->
+  <script>
+    // Close buttons
+    document.querySelectorAll(".close[data-close]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-close");
+        const el = document.getElementById(id);
+        if (el) el.hidden = true;
+      });
+    });
+
+    // Splash -> Start
+    document.getElementById("splashPlay")?.addEventListener("click", () => {
+      const splash = document.getElementById("splash");
+      splash.style.opacity = "0";
+      setTimeout(() => splash.remove(), 180);
+      document.getElementById("startBtn")?.click();
+    });
+
+    // Hide HUD in Telegram if you want a cleaner look
+    if (window.Telegram && Telegram.WebApp) {
+      Telegram.WebApp.expand();
+      // comment the next line if you want to keep the buttons visible in Telegram
+      // document.querySelector(".controls")?.classList.add("hidden");
+    }
+  </script>
 </body>
 </html>
