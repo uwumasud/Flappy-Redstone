@@ -5,32 +5,58 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Flying Stoney</title>
   <link rel="stylesheet" href="./style.css" />
-  <link rel="icon" href="assets/sprites/gameover.png" />
 </head>
 <body>
-  <canvas id="game" width="288" height="512"></canvas>
+  <!-- Fullscreen canvas -->
+  <canvas id="game" width="288" height="512" aria-label="Flying Stoney"></canvas>
 
-  <!-- Splash screen -->
+  <!-- Minimal splash (nice intro, no clutter) -->
   <div id="splash" class="splash">
     <div class="card">
-      <img src="assets/sprites/message.png" alt="" class="hero" />
+      <img src="assets/sprites/message.png" class="hero" alt="" />
       <h1>Flying Stoney</h1>
-      <p>Built with ❤️ by <a href="https://t.me/your_username" target="_blank">@your_username</a></p>
-      <button id="playBtn" class="cta">▶ Play</button>
+      <p>Tap A or anywhere to flap. START begins.</p>
+      <button id="playBtn" class="cta">▶ START</button>
+    </div>
+  </div>
+
+  <!-- Retro controller overlay -->
+  <div id="controller" class="ctrl">
+    <div class="dpad" aria-hidden="true">
+      <button class="pad up"    data-dir="up"    aria-label="up"></button>
+      <button class="pad left"  data-dir="left"  aria-label="left"></button>
+      <button class="pad right" data-dir="right" aria-label="right"></button>
+      <button class="pad down"  data-dir="down"  aria-label="down"></button>
+    </div>
+    <div class="buttons">
+      <button id="btnA" class="btnA" aria-label="A (flap)">A</button>
+      <button id="btnStart" class="btnStart" aria-label="Start/Pause">START</button>
     </div>
   </div>
 
   <script type="module" src="./src/game.js"></script>
   <script>
+    // Splash → start
     const splash = document.getElementById('splash');
-    const play = document.getElementById('playBtn');
-    play.addEventListener('click', () => {
-      splash.style.opacity = '0';
-      setTimeout(()=> splash.remove(), 250);
+    document.getElementById('playBtn')?.addEventListener('click', () => {
+      splash.style.opacity = '0'; setTimeout(()=>splash.remove(), 200);
       document.dispatchEvent(new Event('startGame'));
     });
 
-    // Telegram auto expand
+    // Controller: A = flap, START toggles start/pause
+    const btnA = document.getElementById('btnA');
+    const btnStart = document.getElementById('btnStart');
+
+    // support long-press/tap
+    const tap = (el, fn) => {
+      const fire = e => { e.preventDefault(); fn(); };
+      el.addEventListener('pointerdown', fire, {passive:false});
+      el.addEventListener('click', fire, {passive:false});
+    };
+    tap(btnA,    () => document.dispatchEvent(new Event('flap')));
+    tap(btnStart,() => document.dispatchEvent(new Event('toggleStart')));
+
+    // Also expand in Telegram
     if (window.Telegram && Telegram.WebApp) Telegram.WebApp.expand();
   </script>
 </body>
