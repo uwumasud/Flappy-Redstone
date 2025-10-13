@@ -1,40 +1,7 @@
-/* Fullscreen canvas, no scroll */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:100%;height:100%;overflow:hidden;background:#0d1117}
-#game{width:100vw;height:100vh;display:block;background:#141a22;object-fit:contain}
-
-/* Splash */
-.splash{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;
-  background:rgba(13,17,23,.92);backdrop-filter:blur(10px);z-index:10;transition:opacity .2s}
-.splash .card{background:linear-gradient(180deg,#0d1117 0%,#0f141b 100%);border:1px solid #2a3340;
-  border-radius:16px;padding:18px 20px;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.55)}
-.hero{width:110px;opacity:.95;margin:6px auto 10px;display:block}
-h1{color:#e6edf3;font:700 24px/1.1 system-ui,Segoe UI,Roboto,Arial}
-.splash p{color:#9da7b3;margin:6px 0 12px}
-.cta{padding:10px 16px;border:0;border-radius:12px;background:#2ea043;color:#fff;font-weight:700;cursor:pointer}
-
-/* Retro controller overlay */
-.ctrl{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;
-  align-items:flex-end;padding:14px;pointer-events:auto;gap:16px}
-.dpad{position:relative;width:120px;height:120px;background:#0f141b;border:1px solid #2a3340;
-  border-radius:16px;box-shadow:inset 0 6px 14px rgba(0,0,0,.35)}
-.pad{position:absolute;width:36px;height:36px;border-radius:8px;border:1px solid #2a3340;
-  background:#1a2330;color:#e6edf3}
-.pad.up{top:8px;left:50%;transform:translateX(-50%)}
-.pad.down{bottom:8px;left:50%;transform:translateX(-50%)}
-.pad.left{left:8px;top:50%;transform:translateY(-50%)}
-.pad.right{right:8px;top:50%;transform:translateY(-50%)}
-
-.buttons{display:flex;flex-direction:column;align-items:flex-end;gap:10px;margin-left:auto}
-.btnA{width:76px;height:76px;border-radius:50%;border:1px solid #2a3340;background:#d13a3a;
-  color:#fff;font-weight:900;font-size:22px;box-shadow:0 8px 20px rgba(0,0,0,.45)}
-.btnA:active{transform:translateY(1px)}
-.btnStart{padding:8px 14px;border-radius:14px;border:1px solid #2a3340;background:#161b22;
-  color:#e6edf3;font-weight:700}
-.btnStart:active{transform:translateY(1px)}
-
-@media (max-width:400px){
-  .dpad{width:100px;height:100px}
-  .pad{width:30px;height:30px}
-  .btnA{width:66px;height:66px}
+#game{
+  width:100vw;height:100vh;display:block;
+  background:#141a22;object-fit:contain; /* preserves aspect */
 }
+
