@@ -2,33 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Flying Stoney</title>
+
+  <!-- Use your gameover icon if you like -->
+  <link rel="icon" href="assets/sprites/gameover.png" />
+
+  <!-- Preload a few heavy images so splash appears instantly -->
+  <link rel="preload" as="image" href="assets/sprites/background-day.png" />
+  <link rel="preload" as="image" href="assets/sprites/base.png" />
+  <link rel="preload" as="image" href="assets/sprites/redbird-midflap.png" />
+
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <!-- Fullscreen game -->
   <canvas id="game" width="288" height="512" aria-label="Flying Stoney"></canvas>
 
-  <!-- Minimal one-button splash -->
+  <!-- Minimal one-button splash that uses your assets -->
   <div id="splash" class="splash" aria-hidden="false">
+    <div class="bg">
+      <img class="bg-img"   src="assets/sprites/background-day.png" alt="" />
+      <img class="base-img" src="assets/sprites/base.png" alt="" />
+    </div>
     <div class="card">
-      <!-- Make the game name a link (edit href to your bot/profile/site) -->
-      <a id="gameName" href="https://t.me/your_username" target="_blank" rel="noopener">
-        Flying Stoney
-      </a>
+      <div class="title">
+        <img src="assets/sprites/redbird-midflap.png" alt="" class="logo" />
+        <a id="gameName" href="https://t.me/your_username" target="_blank" rel="noopener">Flying Stoney</a>
+      </div>
       <p id="subtitle">Tap Play to begin</p>
       <button id="playBtn" class="cta">▶ Play</button>
     </div>
   </div>
 
   <script type="module" src="./src/game.js"></script>
-
-  <!-- Splash wiring -->
   <script>
+    // Telegram expand (safe no-op elsewhere)
+    if (window.Telegram?.WebApp) Telegram.WebApp.expand();
+
+    // Splash wiring
     const splash   = document.getElementById('splash');
     const playBtn  = document.getElementById('playBtn');
     const subtitle = document.getElementById('subtitle');
@@ -40,26 +52,20 @@
     function showSplash(text) {
       if (text) subtitle.textContent = text;
       splash.style.display = 'grid';
-      // force reflow so fade-in works
-      void splash.offsetHeight;
+      void splash.offsetHeight; // reflow for fade-in
       splash.style.opacity = '1';
     }
 
-    // Start game
     playBtn.addEventListener('click', () => {
       hideSplash();
-      // tell game.js to start
       window.dispatchEvent(new Event('stoney:start'));
     });
 
-    // When game.js says "game over", show one-button splash again
+    // Show again after game over with score from game.js
     window.addEventListener('stoney:gameover', (e) => {
       const score = e?.detail?.score ?? 0;
       showSplash(`Game Over — Score: ${score}`);
     });
-
-    // Telegram expand (safe no-op in browser)
-    if (window.Telegram?.WebApp) Telegram.WebApp.expand();
   </script>
 </body>
 </html>
