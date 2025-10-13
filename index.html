@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stoney Bird (JS Port)</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game" width="288" height="512"></canvas>
+    <div id="hud">
+      <button id="startBtn" class="btn">▶️ Start</button>
+      <button id="pauseBtn" class="btn">⏸ Pause</button>
+      <button id="resumeBtn" class="btn" hidden>▶️ Resume</button>
+      <button id="leaderboardBtn" class="btn">🏆 Leaderboard</button>
+      <button id="settingsBtn" class="btn">⚙️ Settings</button>
+      <button id="aboutBtn" class="btn">ℹ️ About</button>
+    </div>
+
+    <div id="panelSettings" class="panel" hidden>
+      <div class="panel-header">
+        <h3>Settings</h3>
+        <button class="close" data-close="panelSettings">✕</button>
+      </div>
+      <div class="panel-body">
+        <label class="row"><span>Sound</span><input type="checkbox" id="soundChk"></label>
+        <label class="row"><span>Difficulty</span>
+          <select id="difficultySel">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+        </label>
+        <label class="row"><span>Player name</span><input id="playerName" maxlength="20" /></label>
+      </div>
+    </div>
+
+    <div id="panelAbout" class="panel" hidden>
+      <div class="panel-header">
+        <h3>About</h3>
+        <button class="close" data-close="panelAbout">✕</button>
+      </div>
+      <div class="panel-body">
+        <p><b>Stoney Bird</b> — JS Canvas port inspired by FlapPyBird.</p>
+      </div>
+    </div>
+
+    <div id="panelLB" class="panel" hidden>
+      <div class="panel-header">
+        <h3>Leaderboard (Local)</h3>
+        <button class="close" data-close="panelLB">✕</button>
+      </div>
+      <div class="panel-body">
+        <ul id="lbList" class="lb"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/game.js"></script>
+</body>
+</html>
