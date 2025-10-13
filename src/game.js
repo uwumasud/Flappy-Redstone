@@ -1,42 +1,58 @@
-// src/game.js — minimal, robust, no UI. Tap/Space: start, then flap.
-// Works even if some images are still loading or optional files are missing.
+// src/game.js — minimal, robust, one-tap start, then flap.
+// Fixed-step physics, HiDPI canvas, and strong guards against missing pieces.
 
-import { Window } from './utils/window.js';
-import { Images } from './utils/images.js';
-import { Sounds } from './utils/sounds.js';
+import { Window }   from './utils/window.js';
+import { Images }   from './utils/images.js';
+import { Sounds }   from './utils/sounds.js';
 
-import { Background } from './entities/background.js';
-import { Floor } from './entities/floor.js';
-import { Pipes } from './entities/pipe.js';
-import { Player, PlayerMode } from './entities/player.js';
+import { Background }        from './entities/background.js';
+import { Floor }             from './entities/floor.js';
+import { Pipes }             from './entities/pipe.js';
+import { Player, PlayerMode }from './entities/player.js';
 
-// --------- canvas/context ----------
+// ---------- Canvas / Context ----------
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
 ctx.imageSmoothingEnabled = false;
 
-// --------- core singletons ----------
-const win = new Window(canvas.width, canvas.height);
-const images = new Images();
-const sounds = new Sounds();
-const config = { ctx, window: win, images, sounds, screen: canvas, dt: 1 };
+// Scale drawing to devicePixelRatio for crisp sprites but keep world = 288x512
+function fitHiDPI() {
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  canvas.width  = Math.round(288 * dpr);
+  canvas.height = Math.round(512 * dpr);
+  // Draw in 288x512 world units
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+fitHiDPI();
+window.addEventListener('resize', fitHiDPI);
 
-// --------- state ----------
+// ---------- Core singletons ----------
+const win     = new Window(288, 512); // world space stays constant
+const images  = new Images();
+const sounds  = new Sounds();
+const config  = { ctx, window: win, images, sounds, screen: canvas, dt: 1 };
+
+// ---------- State ----------
 let background, floor, pipes, player;
 let running = false, paused = false, rafId = null;
 let last = 0, acc = 0;
 const STEP_MS = 1000 / 60; // fixed timestep
 let score = 0;
 
-// --------- helpers ----------
+// ---------- Helpers ----------
 const collides = (a, b) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-const playerRect = () => player?.hitbox || player?.rect || { x:0,y:0,w:0,h:0 };
+
+const playerRect = () => player?.hitbox || player?.rect || { x:0, y:0, w:0, h:0 };
 const clear = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-// --------- world build ----------
+// Support both our Pipes implementation (upper/lower) and older ones (upper_pipes/lower_pipes)
+function getUpperPipes() { return pipes?.upper || pipes?.upper_pipes || []; }
+function getLowerPipes() { return pipes?.lower || pipes?.lower_pipes || []; }
+
+// ---------- World build ----------
 function buildWorld(mode = 'idle') {
-  images.randomize?.();
+  images.randomize?.(); // harmless if not implemented
   background = new Background(config);
   floor      = new Floor(config);
   pipes      = new Pipes(config);
@@ -45,12 +61,13 @@ function buildWorld(mode = 'idle') {
   player.set_mode(mode === 'play' ? PlayerMode.NORMAL : PlayerMode.SHM);
 }
 
-// --------- init ----------
+// ---------- Init ----------
 (async function init() {
-  try { await images.load(); } catch(e) { console.warn('images.load failed', e); }
+  try { await images.load(); } catch (e) { console.warn('images.load failed', e); }
   buildWorld('idle');
   drawIdle();
 
+  // First tap/space starts; thereafter it flaps
   const startOrFlap = () => {
     if (!running) { start(); return; }
     player?.flap?.();
@@ -60,45 +77,52 @@ function buildWorld(mode = 'idle') {
     if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); startOrFlap(); }
   });
 
-  // In Telegram expand viewport (safe no-op in browser)
-  if (window.Telegram?.WebApp) window.Telegram.WebApp.expand();
+  // Telegram webview expand (no-op in browsers)
+  try { if (window.Telegram?.WebApp) window.Telegram.WebApp.expand(); } catch {}
 })();
 
 function drawIdle() {
   clear();
-  // safe draws even if images not ready
   try { background.tick(1); } catch {}
-  try { floor.tick(1); } catch {}
-  // draw a tiny hint
+  try { floor.tick(1); }      catch {}
+
+  // hint
   ctx.save();
   ctx.font = 'bold 18px system-ui,Segoe UI,Roboto,Arial';
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
-  ctx.fillText('Tap to Start', canvas.width/2, canvas.height*0.35);
+  ctx.fillText('Tap to Start', canvas.width / 2, canvas.height * 0.35);
   ctx.restore();
 }
 
-// --------- start / loop / game over ----------
+// ---------- Start / Loop / Game over ----------
 function start() {
+  if (running) return; // guard double start
   running = true; paused = false;
   buildWorld('play');
   last = 0; acc = 0;
-  loop(performance.now());
+  rafId && cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
 }
 
 function loop(t) {
-  if (paused || !running) { cancelAnimationFrame(rafId); return; }
+  if (paused || !running) { rafId && cancelAnimationFrame(rafId); return; }
   rafId = requestAnimationFrame(loop);
 
   if (!last) last = t;
-  let dtMs = Math.min(t - last, 1000/20); // clamp big jumps
-  last = t; acc += dtMs;
+  let dtMs = t - last;
+  last = t;
+
+  // Clamp huge spikes (tab switches) to avoid tunneling through pipes
+  dtMs = Math.min(dtMs, 1000 / 20); // max ~50ms
+  acc += dtMs;
 
   while (acc >= STEP_MS) {
-    config.dt = STEP_MS / (1000/60); // ≈1.0 @60fps
+    config.dt = STEP_MS / (1000 / 60); // ≈ 1.0 per 60fps step
     update(config.dt);
     acc -= STEP_MS;
   }
+
   render();
 }
 
@@ -107,51 +131,61 @@ function update(dt) {
   floor.update?.(dt);
   player.update?.(dt);
 
-  // ground
-  if (player.y + player.h >= floor.y) return gameOver();
+  // Floor must exist (defensive)
+  if (!floor) return;
 
-  // pipes
-  for (let i = 0; i < pipes.upper.length; i++) {
-    const up = pipes.upper[i], low = pipes.lower[i];
+  // Ground collision
+  if (player && (player.y + player.h >= floor.y)) {
+    gameOver();
+    return;
+  }
 
-    // score when passing trailing edge of the upper pipe
-    if (!up.scored && player.x > up.x + up.w) {
-      up.scored = true; score++;
+  // Pipes (support both property schemes)
+  const uppers = getUpperPipes();
+  const lowers = getLowerPipes();
+
+  for (let i = 0; i < uppers.length; i++) {
+    const up  = uppers[i];
+    const low = lowers[i];
+
+    // Score once when player fully passes the upper pipe's trailing edge
+    if (up && !up.scored && player.x > up.x + up.w) {
+      up.scored = true;
+      score++;
       try { sounds.point?.play?.(); } catch {}
     }
+
     const p = playerRect();
-    if (collides(p, {x:up.x,y:up.y,w:up.w,h:up.h}) ||
-        collides(p, {x:low.x,y:low.y,w:low.w,h:low.h})) {
-      return gameOver();
-    }
+    if (up  && collides(p, { x: up.x,  y: up.y,  w: up.w,  h: up.h })) { gameOver(); return; }
+    if (low && collides(p, { x: low.x, y: low.y, w: low.w, h: low.h })) { gameOver(); return; }
   }
 }
 
 function render() {
   clear();
-  // draw background / pipes / floor / player
   try { background.tick(config.dt); } catch {}
-  try { pipes.tick(config.dt); } catch {}
-  try { floor.tick(config.dt); } catch {}
-  try { player.tick(config.dt); } catch {}
+  try { pipes.tick(config.dt); }      catch {}
+  try { floor.tick(config.dt); }      catch {}
+  try { player.tick(config.dt); }     catch {}
 
-  // simple score (in case your Score entity is removed)
+  // Simple score text (works even if you removed a Score entity)
   ctx.save();
   ctx.font = 'bold 22px system-ui,Segoe UI,Roboto,Arial';
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
-  ctx.fillText(String(score), canvas.width/2, 40);
+  ctx.fillText(String(score), canvas.width / 2, 40);
   ctx.restore();
 }
 
 function gameOver() {
   running = false;
   try { sounds.hit?.play?.(); } catch {}
-  // Draw last frame, then reset to idle so next tap restarts
-  render();
+
+  // Draw one last frame, then reset to idle so next tap restarts
+  try { render(); } catch {}
   buildWorld('idle');
   drawIdle();
 }
 
-// expose for console if needed
+// Expose for quick manual start in console (optional)
 window._start = start;
