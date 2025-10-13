@@ -2,15 +2,64 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
   <title>Flying Stoney</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
+  <!-- Fullscreen game -->
   <canvas id="game" width="288" height="512" aria-label="Flying Stoney"></canvas>
+
+  <!-- Minimal one-button splash -->
+  <div id="splash" class="splash" aria-hidden="false">
+    <div class="card">
+      <!-- Make the game name a link (edit href to your bot/profile/site) -->
+      <a id="gameName" href="https://t.me/your_username" target="_blank" rel="noopener">
+        Flying Stoney
+      </a>
+      <p id="subtitle">Tap Play to begin</p>
+      <button id="playBtn" class="cta">▶ Play</button>
+    </div>
+  </div>
+
   <script type="module" src="./src/game.js"></script>
+
+  <!-- Splash wiring -->
   <script>
-    if (window.Telegram && Telegram.WebApp) Telegram.WebApp.expand();
+    const splash   = document.getElementById('splash');
+    const playBtn  = document.getElementById('playBtn');
+    const subtitle = document.getElementById('subtitle');
+
+    function hideSplash() {
+      splash.style.opacity = '0';
+      setTimeout(() => { splash.style.display = 'none'; }, 180);
+    }
+    function showSplash(text) {
+      if (text) subtitle.textContent = text;
+      splash.style.display = 'grid';
+      // force reflow so fade-in works
+      void splash.offsetHeight;
+      splash.style.opacity = '1';
+    }
+
+    // Start game
+    playBtn.addEventListener('click', () => {
+      hideSplash();
+      // tell game.js to start
+      window.dispatchEvent(new Event('stoney:start'));
+    });
+
+    // When game.js says "game over", show one-button splash again
+    window.addEventListener('stoney:gameover', (e) => {
+      const score = e?.detail?.score ?? 0;
+      showSplash(`Game Over — Score: ${score}`);
+    });
+
+    // Telegram expand (safe no-op in browser)
+    if (window.Telegram?.WebApp) Telegram.WebApp.expand();
   </script>
 </body>
 </html>
