@@ -3,9 +3,9 @@ import { Entity } from './entity.js';
 import { clamp } from '../utils/misc.js';
 
 // ---- Tunables (adjust to taste) ----
-const FLAP_IMPULSE = -8;   // upward kick (was -9)
-const GRAVITY      = 0.55; // per tick accel (was 1.0, now softer)
-const W_FALLBACK   = 34;   // used until sprite image finishes loading
+const FLAP_IMPULSE = -6.5;  // was -8
+const GRAVITY      = 0.42;  // was 0.55
+const W_FALLBACK   = 34;
 const H_FALLBACK   = 24;
 // ------------------------------------
 
