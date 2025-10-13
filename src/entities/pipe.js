@@ -1,10 +1,10 @@
 import { Entity } from './entity.js';
 
-// ---- Tunables (try these first) ----
-const PIPE_SPEED   = -2.6; // was -5  (less negative = slower)
-const PIPE_GAP_Y   = 160;  // was 120  (bigger gap = easier)
-const SPAWN_EVERY  = 120;  // was 90   (more frames between spawns ~ 2s at 60fps)
-// ------------------------------------
+// ---- Ultra-slow & easy preset ----
+const PIPE_SPEED   = -2.1;  // world scroll (less negative = slower)
+const PIPE_GAP_Y   = 180;   // vertical gap between top/bottom pipes (bigger = easier)
+const SPAWN_EVERY  = 140;   // frames between spawns (~2.3s at 60fps)
+// ----------------------------------
 
 export class Pipe extends Entity {
   constructor(config, image, x, y, w, h){
@@ -29,8 +29,8 @@ export class Pipes {
   randY(){
     const img = this.config.images.pipe[0];
     const ph = (img && img.height) || 320;
-    const minY = -ph + 40;
-    const maxY = -40;
+    const minY = -ph + 40;  // top pipe higher bound (off-screen)
+    const maxY = -60;       // top pipe lower bound
     return Math.floor(Math.random()*(maxY-minY)+minY);
   }
   spawn(){
@@ -43,7 +43,7 @@ export class Pipes {
     const lowImg = this.config.images.pipe[1];
 
     const y = this.randY();
-    const upPipe = new Pipe(this.config, upImg, x, y, pipeW, pipeH);
+    const upPipe  = new Pipe(this.config, upImg,  x, y,                pipeW, pipeH);
     const lowPipe = new Pipe(this.config, lowImg, x, y + pipeH + this.gapY, pipeW, pipeH);
 
     this.upper.push(upPipe);
@@ -52,8 +52,8 @@ export class Pipes {
   canSpawn(){
     const last = this.upper[this.upper.length-1];
     if (!last) return true;
-    // wait until last pipe is well left before spawning next
-    return this.config.window.w - (last.x + last.w) > last.w * 3.0;
+    // wait longer before next pipe (slower pacing)
+    return this.config.window.w - (last.x + last.w) > last.w * 3.5;
   }
   tick(){
     this.frame++;
