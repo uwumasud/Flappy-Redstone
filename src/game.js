@@ -10,6 +10,13 @@ import { Floor }             from './entities/floor.js';
 import { Pipes }             from './entities/pipe.js';
 import { Player, PlayerMode }from './entities/player.js';
 
+// ---------- Game Over banner preload ----------
+const GO_SRC = 'assets/sprites/gameover.png';
+const gameOverImg = new Image();
+let gameOverReady = false;
+gameOverImg.onload = () => { gameOverReady = true; };
+gameOverImg.src = GO_SRC;
+
 // ---------- Canvas / Context ----------
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
@@ -49,6 +56,48 @@ const clear = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
 // Support both our Pipes implementation (upper/lower) and older ones (upper_pipes/lower_pipes)
 function getUpperPipes() { return pipes?.upper || pipes?.upper_pipes || []; }
 function getLowerPipes() { return pipes?.lower || pipes?.lower_pipes || []; }
+
+// --- Game Over overlay (fade-in) ---
+function drawGameOverOverlay(alpha = 1) {
+  const a = Math.max(0, Math.min(1, alpha));
+
+  ctx.save();
+
+  // Dim the whole frame
+  ctx.globalAlpha = Math.min(0.6 * a, 0.6);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Banner
+  ctx.globalAlpha = a;
+  const rawW = gameOverImg.naturalWidth  || 192;
+  const rawH = gameOverImg.naturalHeight || 42;
+
+  // Scale banner to fit nicely (max 75% of canvas width)
+  const scale = Math.min(1, (canvas.width * 0.75) / rawW);
+  const bw = Math.round(rawW * scale);
+  const bh = Math.round(rawH * scale);
+  const bx = (canvas.width - bw) / 2;
+  const by = Math.round(canvas.height * 0.32 - bh / 2);
+
+  if (gameOverReady) {
+    ctx.drawImage(gameOverImg, bx, by, bw, bh);
+  } else {
+    // Text fallback if image not ready yet
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 28px system-ui,Segoe UI,Roboto,Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Game Over', canvas.width / 2, canvas.height * 0.35);
+  }
+
+  // Score under the banner
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 20px system-ui,Segoe UI,Roboto,Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(`Score: ${score}`, canvas.width / 2, by + bh + 32);
+
+  ctx.restore();
+}
 
 // ---------- World build ----------
 function buildWorld(mode = 'idle') {
@@ -181,10 +230,24 @@ function gameOver() {
   running = false;
   try { sounds.hit?.play?.(); } catch {}
 
-  // Draw one last frame, then reset to idle so next tap restarts
+  // Draw one last gameplay frame
   try { render(); } catch {}
-  buildWorld('idle');
-  drawIdle();
+
+  // Fade-in the game-over overlay
+  const START = performance.now();
+  const DURATION = 350; // ms
+  function step(t) {
+    const p = Math.min(1, (t - START) / DURATION);
+    drawGameOverOverlay(p);
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+
+  // After a short pause, reset to idle ("Tap to Start")
+  setTimeout(() => {
+    buildWorld('idle');
+    drawIdle();
+  }, 1500);
 }
 
 // Expose for quick manual start in console (optional)
