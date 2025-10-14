@@ -1,14 +1,15 @@
-// src/game.js — minimal, robust, one-tap start, then flap.
-// Fixed-step physics, HiDPI canvas, and strong guards against missing pieces.
+// src/game.js — minimal, robust, one-tap start → flap.
+// Fixed-step physics, HiDPI canvas, world-space centering,
+// and a fade-in Game Over overlay using assets/sprites/gameover.png.
 
 import { Window }   from './utils/window.js';
 import { Images }   from './utils/images.js';
 import { Sounds }   from './utils/sounds.js';
 
-import { Background }        from './entities/background.js';
-import { Floor }             from './entities/floor.js';
-import { Pipes }             from './entities/pipe.js';
-import { Player, PlayerMode }from './entities/player.js';
+import { Background }         from './entities/background.js';
+import { Floor }              from './entities/floor.js';
+import { Pipes }              from './entities/pipe.js';
+import { Player, PlayerMode } from './entities/player.js';
 
 // ---------- Game Over banner preload ----------
 const GO_SRC = 'assets/sprites/gameover.png';
@@ -22,12 +23,11 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
 ctx.imageSmoothingEnabled = false;
 
-// Scale drawing to devicePixelRatio for crisp sprites but keep world = 288x512
+// HiDPI fit (draw in 288x512 world units)
 function fitHiDPI() {
   const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
   canvas.width  = Math.round(288 * dpr);
   canvas.height = Math.round(512 * dpr);
-  // Draw in 288x512 world units
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 fitHiDPI();
@@ -53,55 +53,54 @@ const collides = (a, b) =>
 const playerRect = () => player?.hitbox || player?.rect || { x:0, y:0, w:0, h:0 };
 const clear = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-// Support both our Pipes implementation (upper/lower) and older ones (upper_pipes/lower_pipes)
-function getUpperPipes() { return pipes?.upper || pipes?.upper_pipes || []; }
-function getLowerPipes() { return pipes?.lower || pipes?.lower_pipes || []; }
+// Support both Pipes shapes (upper/lower vs upper_pipes/lower_pipes)
+const getUpperPipes = () => pipes?.upper || pipes?.upper_pipes || [];
+const getLowerPipes = () => pipes?.lower || pipes?.lower_pipes || [];
 
-// --- Game Over overlay (fade-in) ---
+// --- Game Over overlay (world-centered, fade-in) ---
 function drawGameOverOverlay(alpha = 1) {
   const a = Math.max(0, Math.min(1, alpha));
+  const W = win.w, H = win.h;
 
   ctx.save();
 
-  // Dim the whole frame
+  // Dim frame
   ctx.globalAlpha = Math.min(0.6 * a, 0.6);
   ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, W, H);
 
   // Banner
   ctx.globalAlpha = a;
   const rawW = gameOverImg.naturalWidth  || 192;
   const rawH = gameOverImg.naturalHeight || 42;
 
-  // Scale banner to fit nicely (max 75% of canvas width)
-  const scale = Math.min(1, (canvas.width * 0.75) / rawW);
+  const scale = Math.min(1, (W * 0.75) / rawW);
   const bw = Math.round(rawW * scale);
   const bh = Math.round(rawH * scale);
-  const bx = (canvas.width - bw) / 2;
-  const by = Math.round(canvas.height * 0.32 - bh / 2);
+  const bx = Math.round((W - bw) / 2);
+  const by = Math.round(H * 0.32 - bh / 2);
 
   if (gameOverReady) {
     ctx.drawImage(gameOverImg, bx, by, bw, bh);
   } else {
-    // Text fallback if image not ready yet
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 28px system-ui,Segoe UI,Roboto,Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('Game Over', canvas.width / 2, canvas.height * 0.35);
+    ctx.fillText('Game Over', W / 2, H * 0.35);
   }
 
-  // Score under the banner
+  // Score text
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 20px system-ui,Segoe UI,Roboto,Arial';
   ctx.textAlign = 'center';
-  ctx.fillText(`Score: ${score}`, canvas.width / 2, by + bh + 32);
+  ctx.fillText(`Score: ${score}`, W / 2, by + bh + 32);
 
   ctx.restore();
 }
 
 // ---------- World build ----------
 function buildWorld(mode = 'idle') {
-  images.randomize?.(); // harmless if not implemented
+  images.randomize?.();
   background = new Background(config);
   floor      = new Floor(config);
   pipes      = new Pipes(config);
@@ -126,7 +125,6 @@ function buildWorld(mode = 'idle') {
     if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); startOrFlap(); }
   });
 
-  // Telegram webview expand (no-op in browsers)
   try { if (window.Telegram?.WebApp) window.Telegram.WebApp.expand(); } catch {}
 })();
 
@@ -135,39 +133,38 @@ function drawIdle() {
   try { background.tick(1); } catch {}
   try { floor.tick(1); }      catch {}
 
-  // hint
+  const W = win.w, H = win.h;
   ctx.save();
   ctx.font = 'bold 18px system-ui,Segoe UI,Roboto,Arial';
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
-  ctx.fillText('Tap to Start', canvas.width / 2, canvas.height * 0.35);
+  ctx.fillText('Tap to Start', W / 2, H * 0.35);
   ctx.restore();
 }
 
 // ---------- Start / Loop / Game over ----------
 function start() {
-  if (running) return; // guard double start
+  if (running) return;
   running = true; paused = false;
   buildWorld('play');
   last = 0; acc = 0;
-  rafId && cancelAnimationFrame(rafId);
+  if (rafId) cancelAnimationFrame(rafId);
   rafId = requestAnimationFrame(loop);
 }
 
 function loop(t) {
-  if (paused || !running) { rafId && cancelAnimationFrame(rafId); return; }
+  if (paused || !running) { if (rafId) cancelAnimationFrame(rafId); return; }
   rafId = requestAnimationFrame(loop);
 
   if (!last) last = t;
   let dtMs = t - last;
   last = t;
 
-  // Clamp huge spikes (tab switches) to avoid tunneling through pipes
-  dtMs = Math.min(dtMs, 1000 / 20); // max ~50ms
+  dtMs = Math.min(dtMs, 1000 / 20); // clamp big spikes
   acc += dtMs;
 
   while (acc >= STEP_MS) {
-    config.dt = STEP_MS / (1000 / 60); // ≈ 1.0 per 60fps step
+    config.dt = STEP_MS / (1000 / 60);
     update(config.dt);
     acc -= STEP_MS;
   }
@@ -180,16 +177,13 @@ function update(dt) {
   floor.update?.(dt);
   player.update?.(dt);
 
-  // Floor must exist (defensive)
-  if (!floor) return;
-
-  // Ground collision
+  // ground
   if (player && (player.y + player.h >= floor.y)) {
     gameOver();
     return;
   }
 
-  // Pipes (support both property schemes)
+  // pipes
   const uppers = getUpperPipes();
   const lowers = getLowerPipes();
 
@@ -197,7 +191,6 @@ function update(dt) {
     const up  = uppers[i];
     const low = lowers[i];
 
-    // Score once when player fully passes the upper pipe's trailing edge
     if (up && !up.scored && player.x > up.x + up.w) {
       up.scored = true;
       score++;
@@ -217,25 +210,23 @@ function render() {
   try { floor.tick(config.dt); }      catch {}
   try { player.tick(config.dt); }     catch {}
 
-  // Simple score text (works even if you removed a Score entity)
+  // score
   ctx.save();
   ctx.font = 'bold 22px system-ui,Segoe UI,Roboto,Arial';
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
-  ctx.fillText(String(score), canvas.width / 2, 40);
+  ctx.fillText(String(score), win.w / 2, 40);
   ctx.restore();
 }
 
 function gameOver() {
   running = false;
   try { sounds.hit?.play?.(); } catch {}
-
-  // Draw one last gameplay frame
   try { render(); } catch {}
 
-  // Fade-in the game-over overlay
+  // Fade-in overlay
   const START = performance.now();
-  const DURATION = 350; // ms
+  const DURATION = 350;
   function step(t) {
     const p = Math.min(1, (t - START) / DURATION);
     drawGameOverOverlay(p);
@@ -243,12 +234,11 @@ function gameOver() {
   }
   requestAnimationFrame(step);
 
-  // After a short pause, reset to idle ("Tap to Start")
+  // Return to idle after short pause
   setTimeout(() => {
     buildWorld('idle');
     drawIdle();
   }, 1500);
 }
 
-// Expose for quick manual start in console (optional)
-window._start = start;
+window._start = start; // optional console helper
