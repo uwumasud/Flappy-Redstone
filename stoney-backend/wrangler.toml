@@ -11,4 +11,4 @@ ALLOW_ORIGIN = "*"
 binding = "DB"
 database_name = "stoney-db"
 # replace with the database_id you get from 'wrangler d1 create'
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "ebb8404e-396e-476c-b736-6a12e0f4df20"
